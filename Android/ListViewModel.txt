@@ -1,0 +1,27 @@
+class ListViewModel : ViewModel() {
+
+    // 缓存：itemId -> LoadState
+    private val _cache = mutableStateMapOf<Int, LoadState>()
+    val cache: Map<Int, LoadState> = _cache
+
+    fun loadIfNeeded(itemId: Int) {
+        val current = _cache[itemId]
+
+        // 已加载 or 正在加载 → 不重复请求
+        if (current is LoadState.Loaded || current is LoadState.Loading) {
+            return
+        }
+
+        _cache[itemId] = LoadState.Loading
+
+        viewModelScope.launch {
+            try {
+                delay(1500) // 模拟接口
+                val data = ItemData("Data for $itemId")
+                _cache[itemId] = LoadState.Loaded(data)
+            } catch (e: Exception) {
+                _cache[itemId] = LoadState.Error(e)
+            }
+        }
+    }
+}

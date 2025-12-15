@@ -1,0 +1,38 @@
+@Composable
+fun ItemRow(
+    index: Int,
+    selected: Boolean,
+    loadState: LoadState?,
+    onClick: () -> Unit
+) {
+    Row(
+        modifier = Modifier
+            .fillMaxWidth()
+            .clickable { onClick() }
+            .padding(16.dp)
+    ) {
+        Text("Item $index")
+
+        Spacer(Modifier.weight(1f))
+
+        when (loadState) {
+            is LoadState.Loading -> {
+                CircularProgressIndicator(
+                    modifier = Modifier.size(20.dp),
+                    strokeWidth = 2.dp
+                )
+            }
+            is LoadState.Loaded -> {
+                Text("✅")
+            }
+            is LoadState.Error -> {
+                Text("❌")
+            }
+            else -> {
+                if (selected) {
+                    Text("未加载")
+                }
+            }
+        }
+    }
+}

@@ -1,0 +1,30 @@
+@Composable
+fun SelectableList(
+    viewModel: ListViewModel = viewModel()
+) {
+    val listState = rememberLazyListState()
+    var selectedIndex by remember { mutableStateOf<Int?>(null) }
+
+    LazyColumn(state = listState) {
+        items(100) { index ->
+
+            val loadState = viewModel.cache[index]
+
+            // ⭐ 核心：当选中变化时触发检查加载
+            LaunchedEffect(selectedIndex) {
+                if (selectedIndex == index) {
+                    viewModel.loadIfNeeded(index)
+                }
+            }
+
+            ItemRow(
+                index = index,
+                selected = selectedIndex == index,
+                loadState = loadState,
+                onClick = {
+                    selectedIndex = index
+                }
+            )
+        }
+    }
+}
