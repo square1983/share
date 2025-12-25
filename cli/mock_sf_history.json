@@ -1,0 +1,159 @@
+{
+  "events": [
+    {
+      "timestamp": "2023-10-27T10:00:00.000Z",
+      "type": "ExecutionStarted",
+      "id": 1,
+      "previousEventId": 0,
+      "executionStartedEventDetails": {
+        "input": "{}",
+        "roleArn": "arn:aws:iam::123456789012:role/service-role/StepFunctions-MyStateMachine-role"
+      }
+    },
+    {
+      "timestamp": "2023-10-27T10:00:01.000Z",
+      "type": "TaskStateEntered",
+      "id": 2,
+      "previousEventId": 1,
+      "stateEnteredEventDetails": {
+        "name": "ProcessFile",
+        "input": "{}"
+      }
+    },
+    {
+      "timestamp": "2023-10-27T10:00:01.100Z",
+      "type": "LambdaFunctionScheduled",
+      "id": 3,
+      "previousEventId": 2,
+      "lambdaFunctionScheduledEventDetails": {
+        "resource": "arn:aws:lambda:us-east-1:123456789012:function:ProcessFile",
+        "input": "{}"
+      }
+    },
+    {
+      "timestamp": "2023-10-27T10:00:01.200Z",
+      "type": "LambdaFunctionStarted",
+      "id": 4,
+      "previousEventId": 3
+    },
+    {
+      "timestamp": "2023-10-27T10:00:02.000Z",
+      "type": "LambdaFunctionSucceeded",
+      "id": 5,
+      "previousEventId": 4,
+      "lambdaFunctionSucceededEventDetails": {
+        "output": "{\"status\":\"ok\"}"
+      }
+    },
+    {
+      "timestamp": "2023-10-27T10:00:02.100Z",
+      "type": "TaskStateExited",
+      "id": 6,
+      "previousEventId": 5,
+      "stateExitedEventDetails": {
+        "name": "ProcessFile",
+        "output": "{\"status\":\"ok\"}"
+      }
+    },
+    {
+      "timestamp": "2023-10-27T10:00:03.000Z",
+      "type": "TaskStateEntered",
+      "id": 7,
+      "previousEventId": 6,
+      "stateEnteredEventDetails": {
+        "name": "RunContainer"
+      }
+    },
+    {
+      "timestamp": "2023-10-27T10:00:03.100Z",
+      "type": "TaskScheduled",
+      "id": 8,
+      "previousEventId": 7,
+      "taskScheduledEventDetails": {
+        "resourceType": "ecs",
+        "resource": "arn:aws:states:::ecs:runTask.sync",
+        "region": "us-east-1",
+        "parameters": "{\"Cluster\":\"arn:aws:ecs:us-east-1:123456789012:cluster/MyCluster\"}"
+      }
+    },
+    {
+      "timestamp": "2023-10-27T10:00:03.500Z",
+      "type": "TaskSubmitted",
+      "id": 9,
+      "previousEventId": 8,
+      "taskSubmittedEventDetails": {
+        "resourceType": "ecs",
+        "resource": "arn:aws:states:::ecs:runTask.sync",
+        "output": "{\"TaskArn\":\"arn:aws:ecs:us-east-1:123456789012:task/MyCluster/98765432109876543210\"}"
+      }
+    },
+    {
+      "timestamp": "2023-10-27T10:00:10.000Z",
+      "type": "TaskSucceeded",
+      "id": 10,
+      "previousEventId": 9,
+      "taskSucceededEventDetails": {
+        "resourceType": "ecs",
+        "resource": "arn:aws:states:::ecs:runTask.sync",
+        "output": "{}"
+      }
+    },
+    {
+      "timestamp": "2023-10-27T10:00:10.100Z",
+      "type": "TaskStateExited",
+      "id": 11,
+      "previousEventId": 10,
+      "stateExitedEventDetails": {
+        "name": "RunContainer"
+      }
+    },
+    {
+       "timestamp": "2023-10-27T10:00:11.000Z",
+       "type": "TaskStateEntered",
+       "id": 12,
+       "previousEventId": 11,
+       "stateEnteredEventDetails": {
+         "name": "ETLJob"
+       }
+    },
+    {
+       "timestamp": "2023-10-27T10:00:11.100Z",
+       "type": "TaskScheduled",
+       "id": 13,
+       "previousEventId": 12,
+       "taskScheduledEventDetails": {
+         "resourceType": "glue",
+         "resource": "arn:aws:states:::glue:startJobRun.sync",
+         "parameters": "{\"JobName\":\"vdb-2nd-hash-add-rownum-create\"}"
+       }
+    },
+    {
+       "timestamp": "2023-10-27T10:00:12.000Z",
+       "type": "TaskSubmitted",
+       "id": 14,
+       "previousEventId": 13,
+       "taskSubmittedEventDetails": {
+         "resourceType": "glue",
+         "resource": "arn:aws:states:::glue:startJobRun.sync",
+         "output": "{\"JobRunId\":\"jr_3254notrealid\"}"
+       }
+    },
+    {
+       "timestamp": "2023-10-27T10:01:00.000Z",
+       "type": "TaskSucceeded",
+       "id": 15,
+       "previousEventId": 14,
+       "taskSucceededEventDetails": {
+         "resourceType": "glue",
+         "resource": "arn:aws:states:::glue:startJobRun.sync",
+         "output": "{}"
+       }
+    },
+    {
+      "timestamp": "2023-10-27T10:01:01.000Z",
+      "type": "ExecutionSucceeded",
+      "id": 16,
+      "previousEventId": 15
+    }
+  ]
+}
