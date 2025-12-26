@@ -1,0 +1,10 @@
+aws cloudwatch get-metric-statistics \
+  --namespace ECS/ContainerInsights \
+  --metric-name CPUUtilization \
+  --dimensions \
+    Name=ClusterName,Value=<CLUSTER_NAME> \
+    Name=TaskId,Value=<TASK_ID> \
+  --statistics Average Maximum \
+  --period 60 \
+  --start-time <TASK_STARTED_AT - 1min> \
+  --end-time <TASK_STOPPED_AT + 1min>
