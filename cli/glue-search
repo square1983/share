@@ -1,0 +1,14 @@
+aws cloudwatch get-metric-data \
+  --start-time 2025-12-23T10:20:00Z \
+  --end-time   2025-12-23T10:45:00Z \
+  --metric-data-queries '[
+    {
+      "Id": "memory_profile",
+      "Expression": "SEARCH(
+        '{Glue,JobName,JobRunId,Type} MetricName=\"glue.*.memory.*.percentage\"',
+        \"Average\",
+        60
+      )",
+      "Label": "Glue Memory Profile"
+    }
+  ]'
