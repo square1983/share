@@ -1,0 +1,11 @@
+aws cloudwatch get-metric-statistics \
+  --namespace "ECS/ContainerInsights" \
+  --metric-name "TaskCpuUtilization" \
+  --dimensions \
+      Name=ClusterName,Value=vdb-prd-cluster-apne1-hash \
+      Name=TaskDefinitionFamily,Value=vdb-prd-taskdef-apne1-hash-id4 \
+  --statistics Average \
+  --period 3600 \
+  --start-time 2025-12-21T00:00:00Z \
+  --end-time   2025-12-23T23:59:59Z \
+  --region ap-northeast-1
