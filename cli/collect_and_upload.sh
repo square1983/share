@@ -225,7 +225,14 @@ jq -r '.steps[] | @base64' "$BASE_DIR/index.json" | while read -r step_b64; do
     fi
 
     if [ "$TYPE" == "lambda" ]; then
-        RESOURCE_ID=$(_jq '.executionId // .resource')
+        # Try to use requestId first, fallback to executionId or resource
+        RESOURCE_ID=$(_jq '.requestId // .executionId // .resource')
+        
+        if [ "$RESOURCE_ID" == "UNKNOWN" ] || [ "$RESOURCE_ID" == "null" ]; then
+             echo "      ⚠️ Lambda RequestID が見つかりません。リソースARNを使用します。"
+             RESOURCE_ID=$(_jq '.resource')
+        fi
+        
         get_lambda_insights "$RESOURCE_ID" "$METRICS_DIR/lambda_${SAFE_STEP_NAME}.json" || echo "      Lambdaメトリクスの取得に失敗しました"
 
     elif [ "$TYPE" == "ecs" ]; then

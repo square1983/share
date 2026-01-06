@@ -146,6 +146,22 @@ reduce $root.events[] as $e (
              endTime: $endTime,
              executionArn: ($out.ExecutionArn // "UNKNOWN")
           }
+       elif $rType == "lambda" then
+          # Handle Lambda tasks (Task state, not Lambda state) specifically to find RequestId
+          (
+             try ($end.taskSucceededEventDetails.output | fromjson) 
+             catch {} 
+          ) as $out |
+          {
+             stepName: $stepName,
+             status: $status,
+             type: "lambda",
+             startTime: ($submitted.timestamp // $scheduled.timestamp // $endTime),
+             endTime: $endTime,
+             resource: ($scheduled.taskScheduledEventDetails.resource // "UNKNOWN"),
+             # Try SdkResponseMetadata.RequestId (SDK invocations) or just RequestId
+             requestId: ($out.SdkResponseMetadata.RequestId // $out.RequestId // "UNKNOWN")
+          }
        else
           {
              stepName: $stepName,
