@@ -1,0 +1,17 @@
+ZIP_FILE="${BASE_DIR}.zip"
+echo "データを圧縮中: $ZIP_FILE ..."
+
+# zip コマンドの確認
+if ! command -v zip &> /dev/null; then
+    echo "エラー: zip コマンドが見つかりません。圧縮できません。"
+    exit 1
+fi
+
+zip -r "$ZIP_FILE" "$BASE_DIR" > /dev/null
+
+echo "S3へアップロード中: $S3_DESTINATION/sf_data_${TIMESTAMP}.zip"
+if [ "$MOCK_MODE" == "true" ]; then
+    echo "MOCK モード: S3アップロードをスキップします。ファイル保存先: $ZIP_FILE"
+else
+    aws s3 cp "$ZIP_FILE" "$S3_DESTINATION/"
+fi
