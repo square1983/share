@@ -18,6 +18,7 @@ TIMESTAMP=$(date +"%Y%m%d_%H%M%S")
 BASE_DIR="sf_data_${TIMESTAMP}"
 METRICS_DIR="${BASE_DIR}/metrics"
 mkdir -p "$METRICS_DIR"
+rm -f "${METRICS_DIR}"/*
 
 echo "作業ディレクトリ: $BASE_DIR"
 
@@ -210,7 +211,9 @@ jq -r '.steps[] | @base64' "$BASE_DIR/index.json" | while read -r step_b64; do
     STATUS=$(_jq '.status')
     STEP_NAME=$(_jq '.stepName')
     
-    SAFE_STEP_NAME=$(echo "$STEP_NAME" | sed 's/[^a-zA-Z0-9_-]/_/g')
+    # ファイル名用にステップ名をサニタイズ
+    # 日本語文字を維持し、ファイルシステムで問題になる文字のみ置換 (/ : スペース)
+    SAFE_STEP_NAME=$(echo "$STEP_NAME" | sed 's/[/:[:space:]]/_/g')
 
     echo "   処理中 [$TYPE] $STEP_NAME ($STATUS)..."
 
@@ -251,12 +254,23 @@ jq -r '.steps[] | @base64' "$BASE_DIR/index.json" | while read -r step_b64; do
     fi
 done
 
-# 4. S3 へのアップロード
-echo "S3へアップロード中: $S3_DESTINATION/sf_data_${TIMESTAMP}/"
+# 4. S3 へのアップロード (Zip圧縮してアップロード)
+ZIP_FILE="${BASE_DIR}.zip"
+echo "データを圧縮中: $ZIP_FILE ..."
+
+# zip コマンドの確認
+if ! command -v zip &> /dev/null; then
+    echo "エラー: zip コマンドが見つかりません。圧縮できません。"
+    exit 1
+fi
+
+zip -r "$ZIP_FILE" "$BASE_DIR" > /dev/null
+
+echo "S3へアップロード中: $S3_DESTINATION/sf_data_${TIMESTAMP}.zip"
 if [ "$MOCK_MODE" == "true" ]; then
-    echo "MOCK モード: S3アップロードをスキップします。ファイル保存先: $BASE_DIR"
+    echo "MOCK モード: S3アップロードをスキップします。ファイル保存先: $ZIP_FILE"
 else
-    aws s3 cp --recursive "$BASE_DIR" "$S3_DESTINATION/sf_data_${TIMESTAMP}/"
+    aws s3 cp "$ZIP_FILE" "$S3_DESTINATION/"
 fi
 
 echo "完了! データ収集が終了しました。"
