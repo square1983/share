@@ -114,6 +114,8 @@ reduce $root.events[] as $e (
            if $rType == "ecs" then
               (try ($scheduled.taskScheduledEventDetails.parameters | fromjson) catch {}) as $params |
               (try ($submitted.taskSubmittedEventDetails.output | fromjson) catch {}) as $out |
+              (try ($end.taskSucceededEventDetails.output | fromjson) catch {}) as $endOut |
+              (($out.TaskArn // $endOut.TaskArn) // "UNKNOWN") as $finalTaskArn |
               {
                  stepName: $stepName,
                  status: $status,
@@ -121,8 +123,8 @@ reduce $root.events[] as $e (
                  startTime: ($submitted.timestamp // $scheduled.timestamp // $endTime),
                  endTime: $endTime,
                  clusterArn: ($params.Cluster // "UNKNOWN"),
-                 taskArn: ($out.TaskArn // "UNKNOWN"),
-                 taskId: (if ($out.TaskArn|type) == "string" then ($out.TaskArn | split("/") | last) else "UNKNOWN" end)
+                 taskArn: $finalTaskArn,
+                 taskId: (if ($finalTaskArn|type) == "string" then ($finalTaskArn | split("/") | last) else "UNKNOWN" end)
               }
            elif $rType == "glue" then
               (try ($scheduled.taskScheduledEventDetails.parameters | fromjson) catch {}) as $params |

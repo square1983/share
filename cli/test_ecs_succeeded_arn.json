@@ -1,0 +1,48 @@
+{
+    "events": [
+        {
+            "type": "ExecutionStarted",
+            "id": 1,
+            "executionStartedEventDetails": {
+                "stateMachineArn": "arn:aws:states:us-east-1:123456789012:stateMachine:Test"
+            }
+        },
+        {
+            "type": "TaskStateEntered",
+            "id": 2,
+            "previousEventId": 1,
+            "stateEnteredEventDetails": {
+                "name": "ECSTask"
+            }
+        },
+        {
+            "type": "TaskScheduled",
+            "id": 3,
+            "previousEventId": 2,
+            "taskScheduledEventDetails": {
+                "resourceType": "ecs",
+                "resource": "arn:aws:states:::ecs:runTask.sync",
+                "parameters": "{}"
+            }
+        },
+        {
+            "type": "TaskSubmitted",
+            "id": 4,
+            "previousEventId": 3,
+            "taskSubmittedEventDetails": {
+                "resourceType": "ecs",
+                "output": "{\"TaskArn\": null}"
+            }
+        },
+        {
+            "type": "TaskSucceeded",
+            "id": 5,
+            "previousEventId": 4,
+            "taskSucceededEventDetails": {
+                "resourceType": "ecs",
+                "output": "{\"TaskArn\": \"arn:aws:ecs:us-east-1:123456789012:task/cluster/taskId\"}"
+            },
+            "timestamp": "2025-01-01T00:00:00Z"
+        }
+    ]
+}
