@@ -122,7 +122,7 @@ reduce $root.events[] as $e (
                  endTime: $endTime,
                  clusterArn: ($params.Cluster // "UNKNOWN"),
                  taskArn: ($out.TaskArn // "UNKNOWN"),
-                 taskId: (($out.TaskArn | split("/") | last) // "UNKNOWN")
+                 taskId: (if ($out.TaskArn|type) == "string" then ($out.TaskArn | split("/") | last) else "UNKNOWN" end)
               }
            elif $rType == "glue" then
               (try ($scheduled.taskScheduledEventDetails.parameters | fromjson) catch {}) as $params |
