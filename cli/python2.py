@@ -50,26 +50,33 @@ def main(root_dir, output_file):
             # Type C: .../C-2/output/metrics  -> ExID is at -3 (if output replaces hash)
             # If we find 'id' at -3 is 'output', we might need to go to -4?
             
-            path_parts = root.split(os.sep)
-            
-            # Helper to find likely execution ID
-            # We assume Execution ID is NOT 'metrics', 'output', or a long hash (unless hash is the ID)
-            # Let's try to look at -3 first, if it is 'output', go to -4.
-            
-            candidate_id = "UNKNOWN"
-            if len(path_parts) >= 3:
-                val = path_parts[-3]
-                if val == 'output' or val == 'sf_data' or val.startswith('sf_data_'):
-                     if len(path_parts) >= 4:
-                         candidate_id = path_parts[-4]
-                     else:
-                         candidate_id = val # Fallback
+            try:
+                # Use relative path from the scanned root_dir to confirm structure
+                # root_path example: .../work/C-2/hash/metrics
+                # root_dir example: .../work
+                # rel_path: C-2/hash/metrics
+                # The first component (C-2) should be the execution ID
+                rel_path = os.path.relpath(root, root_dir)
+                rel_parts = rel_path.split(os.sep)
+                
+                if len(rel_parts) > 0 and rel_parts[0] != '.' and rel_parts[0] != 'metrics':
+                    execution_id = rel_parts[0]
                 else:
-                    candidate_id = val
-            elif len(path_parts) >= 2:
-                candidate_id = path_parts[-2]
-            
-            execution_id = candidate_id
+                    # Fallback if scanning inside the ID folder itself
+                    # e.g. root_dir=.../C-2, rel_path=hash/metrics
+                    # Then ID is root_dir's basename? User said "work" is root.
+                    # check if rel_parts suggests depth
+                    if len(rel_parts) >= 2 and rel_parts[-1] == 'metrics':
+                         # If we are seemingly deep, but relpath logic picked intermediate?
+                         # Let's stick to the top folder of scan.
+                         execution_id = rel_parts[0]
+                    else:
+                         execution_id = "UNKNOWN"
+
+                print(f"DEBUG: Found metrics at '{rel_path}' -> ID: '{execution_id}'")
+
+            except ValueError:
+                execution_id = "UNKNOWN"
 
             if execution_id not in all_data:
                 all_data[execution_id] = {}
