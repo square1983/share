@@ -52,17 +52,18 @@ get_ecs_metric() {
     local TASK_ID=$2
     local START_TIME=$3
     local END_TIME=$4
-    local OUTPUT_FILE=$5
+    local FAMILY=$5
+    local OUTPUT_FILE=$6
 
     if [ -z "$CLUSTER" ] || [ -z "$TASK_ID" ] || [ -z "$START_TIME" ] || [ -z "$END_TIME" ] || [ -z "$OUTPUT_FILE" ]; then
-        echo "エラー: get_ecs_metric 引数が不足しています (CLUSTER TASK_ID START_TIME END_TIME OUTPUT_FILE)"
+        echo "エラー: get_ecs_metric 引数が不足しています (CLUSTER TASK_ID START_TIME END_TIME FAMILY OUTPUT_FILE)"
         return 1
     fi
 
     local TEMP_DIR=$(dirname "$OUTPUT_FILE")/temp_ecs_${TASK_ID}
     mkdir -p "$TEMP_DIR"
 
-    echo "   (ECS) タスク $TASK_ID ($START_TIME から $END_TIME) のメトリクスを取得中..."
+    echo "   (ECS) タスク $TASK_ID (Family: $FAMILY) ($START_TIME から $END_TIME) のメトリクスを取得中..."
 
     # 2. CloudWatch metrics
     CMD_CPU="aws cloudwatch get-metric-statistics --namespace ECS/ContainerInsights --metric-name CPUUtilization --dimensions Name=TaskId,Value=$TASK_ID Name=ClusterName,Value=$CLUSTER --statistics Average Maximum --period 60 --start-time $START_TIME --end-time $END_TIME --output json"
@@ -76,11 +77,11 @@ get_ecs_metric() {
     $CMD_MEM > "$TEMP_DIR/memory.json"
 
     # 3. 結合 (Construct a minimal task object since we don't call describe-tasks)
-    jq -n --arg cluster "$CLUSTER" --arg taskArn "$TASK_ID" --arg start "$START_TIME" --arg stop "$END_TIME" \
+    jq -n --arg cluster "$CLUSTER" --arg taskArn "$TASK_ID" --arg start "$START_TIME" --arg stop "$END_TIME" --arg family "$FAMILY" \
           --slurpfile cpu "$TEMP_DIR/cpu.json" \
           --slurpfile memory "$TEMP_DIR/memory.json" \
           '{ 
-             task: { clusterArn: $cluster, taskArn: $taskArn, startedAt: $start, stoppedAt: $stop }, 
+             task: { clusterArn: $cluster, taskArn: $taskArn, startedAt: $start, stoppedAt: $stop, family: $family }, 
              metrics: { cpu: $cpu[0], memory: $memory[0] } 
            }' \
           > "$OUTPUT_FILE"
@@ -182,7 +183,7 @@ fi
 
 echo "推定された StateMachineArn: $DERIVED_SM_ARN"
 
-jq -f sf_parser.jq --arg inputStateMachineArn "$DERIVED_SM_ARN" "$BASE_DIR/history.json" > "$BASE_DIR/index.json"
+jq -f parser.jq --arg inputStateMachineArn "$DERIVED_SM_ARN" "$BASE_DIR/history.json" > "$BASE_DIR/index.json"
 
 echo "インデックス作成完了: $BASE_DIR/index.json"
 
@@ -230,10 +231,11 @@ jq -r '.steps[] | @base64' "$BASE_DIR/index.json" | while read -r step_b64; do
         TASK_ID=$(_jq '.taskId')
         START_TIME=$(_jq '.startTime')
         END_TIME=$(_jq '.endTime')
+        FAMILY=$(_jq '.family')
         # If END_TIME is null (e.g. running?), default to now or handle it. 
         # But sf_parser usually provides timestamps.
         
-        get_ecs_metric "$CLUSTER" "$TASK_ID" "$START_TIME" "$END_TIME" "$METRICS_DIR/ecs_${SAFE_STEP_NAME}.json" || echo "      ECSメトリクスの取得に失敗しました"
+        get_ecs_metric "$CLUSTER" "$TASK_ID" "$START_TIME" "$END_TIME" "$FAMILY" "$METRICS_DIR/ecs_${SAFE_STEP_NAME}.json" || echo "      ECSメトリクスの取得に失敗しました"
 
     elif [ "$TYPE" == "glue" ]; then
         JOB_NAME=$(_jq '.jobName')

@@ -124,7 +124,8 @@ reduce $root.events[] as $e (
                  endTime: $endTime,
                  clusterArn: ($params.Cluster // "UNKNOWN"),
                  taskArn: $finalTaskArn,
-                 taskId: (if ($finalTaskArn|type) == "string" then ($finalTaskArn | split("/") | last) else "UNKNOWN" end)
+                 taskId: (if ($finalTaskArn|type) == "string" then ($finalTaskArn | split("/") | last) else "UNKNOWN" end),
+                 family: (if ($params.TaskDefinition|type) == "string" then (($params.TaskDefinition | split("/") | last) | split(":") | first) else "UNKNOWN" end)
               }
            elif $rType == "glue" then
               (try ($scheduled.taskScheduledEventDetails.parameters | fromjson) catch {}) as $params |

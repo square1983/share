@@ -5,17 +5,18 @@ CLUSTER=$1
 TASK_ID=$2
 START_TIME=$3
 END_TIME=$4
-OUTPUT_FILE=$5
+FAMILY=$5
+OUTPUT_FILE=$6
 
-if [ -z "$CLUSTER" ] || [ -z "$TASK_ID" ] || [ -z "$START_TIME" ] || [ -z "$END_TIME" ] || [ -z "$OUTPUT_FILE" ]; then
-  echo "使用法: $0 <CLUSTER> <TASK_ID> <START_TIME> <END_TIME> <OUTPUT_FILE>"
+if [ -z "$CLUSTER" ] || [ -z "$TASK_ID" ] || [ -z "$START_TIME" ] || [ -z "$END_TIME" ] || [ -z "$FAMILY" ] || [ -z "$OUTPUT_FILE" ]; then
+  echo "使用法: $0 <CLUSTER> <TASK_ID> <START_TIME> <END_TIME> <FAMILY> <OUTPUT_FILE>"
   exit 1
 fi
 
 TEMP_DIR=$(dirname "$OUTPUT_FILE")/temp_ecs_${TASK_ID}
 mkdir -p "$TEMP_DIR"
 
-echo "タスク $TASK_ID ($START_TIME から $END_TIME) のメトリクスを取得中..."
+echo "タスク $TASK_ID (Family: $FAMILY) ($START_TIME から $END_TIME) のメトリクスを取得中..."
 
 # 1. Get Metrics via CloudWatch (directly, no describe-tasks for time)
 # Note: ContainerInsights must be enabled.
