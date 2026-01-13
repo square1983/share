@@ -1,0 +1,18 @@
+{
+  "task": {
+    "clusterArn": "my-cluster",
+    "taskArn": "my-task",
+    "startedAt": "2025-01-01T00:00:00Z",
+    "stoppedAt": "2025-01-01T01:00:00Z"
+  },
+  "metrics": {
+    "cpu": {
+      "Label": "CPUUtilization",
+      "Datapoints": []
+    },
+    "memory": {
+      "Label": "MemoryUtilization",
+      "Datapoints": []
+    }
+  }
+}

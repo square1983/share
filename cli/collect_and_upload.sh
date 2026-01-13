@@ -63,27 +63,13 @@ get_ecs_metric() {
     echo "   (ECS) タスク $TASK_ID ($START_TIME から $END_TIME) のメトリクスを取得中..."
 
     # 2. CloudWatch metrics
-    aws cloudwatch get-metric-statistics \
-        --namespace ECS/ContainerInsights \
-        --metric-name CPUUtilization \
-        --dimensions Name=TaskId,Value="$TASK_ID" Name=ClusterName,Value="$CLUSTER" \
-        --statistics Average Maximum \
-        --period 60 \
-        --start-time "$START_TIME" \
-        --end-time "$END_TIME" \
-        --output json \
-        > "$TEMP_DIR/cpu.json"
+    CMD_CPU="aws cloudwatch get-metric-statistics --namespace ECS/ContainerInsights --metric-name CPUUtilization --dimensions Name=TaskId,Value=$TASK_ID Name=ClusterName,Value=$CLUSTER --statistics Average Maximum --period 60 --start-time $START_TIME --end-time $END_TIME --output json"
+    echo "      DEBUG: Executing: $CMD_CPU"
+    $CMD_CPU > "$TEMP_DIR/cpu.json"
 
-    aws cloudwatch get-metric-statistics \
-        --namespace ECS/ContainerInsights \
-        --metric-name MemoryUtilization \
-        --dimensions Name=TaskId,Value="$TASK_ID" Name=ClusterName,Value="$CLUSTER" \
-        --statistics Average Maximum \
-        --period 60 \
-        --start-time "$START_TIME" \
-        --end-time "$END_TIME" \
-        --output json \
-        > "$TEMP_DIR/memory.json"
+    CMD_MEM="aws cloudwatch get-metric-statistics --namespace ECS/ContainerInsights --metric-name MemoryUtilization --dimensions Name=TaskId,Value=$TASK_ID Name=ClusterName,Value=$CLUSTER --statistics Average Maximum --period 60 --start-time $START_TIME --end-time $END_TIME --output json"
+    echo "      DEBUG: Executing: $CMD_MEM"
+    $CMD_MEM > "$TEMP_DIR/memory.json"
 
     # 3. 結合 (Construct a minimal task object since we don't call describe-tasks)
     jq -n --arg cluster "$CLUSTER" --arg taskArn "$TASK_ID" --arg start "$START_TIME" --arg stop "$END_TIME" \
