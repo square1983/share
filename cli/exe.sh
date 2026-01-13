@@ -36,6 +36,8 @@ get_lambda_insights() {
     fi
 
     echo "   (Lambda) RequestID: $REQUEST_ID のインサイトを取得中..."
+    CMD_LOGS="aws logs filter-log-events --log-group-name \"/aws/lambda-insights\" --filter-pattern \"{ $.request_id = \\\"$REQUEST_ID\\\" }\" --output json"
+    echo "$CMD_LOGS" >> cmds.txt
     aws logs filter-log-events \
       --log-group-name "/aws/lambda-insights" \
       --filter-pattern "{ $.request_id = \"$REQUEST_ID\" }" \
@@ -65,10 +67,12 @@ get_ecs_metric() {
     # 2. CloudWatch metrics
     CMD_CPU="aws cloudwatch get-metric-statistics --namespace ECS/ContainerInsights --metric-name CPUUtilization --dimensions Name=TaskId,Value=$TASK_ID Name=ClusterName,Value=$CLUSTER --statistics Average Maximum --period 60 --start-time $START_TIME --end-time $END_TIME --output json"
     echo "      DEBUG: Executing: $CMD_CPU"
+    echo "$CMD_CPU" >> cmds.txt
     $CMD_CPU > "$TEMP_DIR/cpu.json"
 
     CMD_MEM="aws cloudwatch get-metric-statistics --namespace ECS/ContainerInsights --metric-name MemoryUtilization --dimensions Name=TaskId,Value=$TASK_ID Name=ClusterName,Value=$CLUSTER --statistics Average Maximum --period 60 --start-time $START_TIME --end-time $END_TIME --output json"
     echo "      DEBUG: Executing: $CMD_MEM"
+    echo "$CMD_MEM" >> cmds.txt
     $CMD_MEM > "$TEMP_DIR/memory.json"
 
     # 3. 結合 (Construct a minimal task object since we don't call describe-tasks)
@@ -99,6 +103,8 @@ get_glue_job_metric() {
     mkdir -p "$TEMP_DIR"
 
     # 1. Job Run 詳細取得
+    CMD_GLUE_RUN="aws glue get-job-run --job-name $JOB_NAME --run-id $RUN_ID --output json"
+    echo "$CMD_GLUE_RUN" >> cmds.txt
     aws glue get-job-run \
       --job-name "$JOB_NAME" \
       --run-id "$RUN_ID" \
@@ -115,6 +121,8 @@ get_glue_job_metric() {
     echo "   (Glue) ジョブ $JOB_NAME / $RUN_ID ($START_TIME から $END_TIME) のメトリクスを取得中..."
 
     # 2. CloudWatch metrics
+    CMD_GLUE_CPU="aws cloudwatch get-metric-statistics --namespace Glue --metric-name glue.driver.cpuLoad --dimensions Name=JobName,Value=$JOB_NAME Name=JobRunId,Value=$RUN_ID Name=Type,Value=gauge --statistics Average Maximum --period 300 --start-time $START_TIME --end-time $END_TIME --output json"
+    echo "$CMD_GLUE_CPU" >> cmds.txt
     aws cloudwatch get-metric-statistics \
         --namespace Glue \
         --metric-name glue.driver.cpuLoad \
@@ -126,6 +134,8 @@ get_glue_job_metric() {
         --output json \
         > "$TEMP_DIR/cpu_load.json"
 
+    CMD_GLUE_MEM="aws cloudwatch get-metric-statistics --namespace Glue --metric-name glue.driver.memoryUsed --dimensions Name=JobName,Value=$JOB_NAME Name=JobRunId,Value=$RUN_ID Name=Type,Value=gauge --statistics Average Maximum --period 300 --start-time $START_TIME --end-time $END_TIME --output json"
+    echo "$CMD_GLUE_MEM" >> cmds.txt
     aws cloudwatch get-metric-statistics \
          --namespace Glue \
          --metric-name glue.driver.memoryUsed \

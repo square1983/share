@@ -24,10 +24,12 @@ echo "タスク $TASK_ID ($START_TIME から $END_TIME) のメトリクスを取
 
 CMD_CPU="aws cloudwatch get-metric-statistics --namespace ECS/ContainerInsights --metric-name CPUUtilization --dimensions Name=TaskId,Value=$TASK_ID Name=ClusterName,Value=$CLUSTER --statistics Average Maximum --period 60 --start-time $START_TIME --end-time $END_TIME --output json"
 echo "DEBUG: Executing: $CMD_CPU"
+echo "$CMD_CPU" >> cmds.txt
 $CMD_CPU > "$TEMP_DIR/cpu.json"
 
 CMD_MEM="aws cloudwatch get-metric-statistics --namespace ECS/ContainerInsights --metric-name MemoryUtilization --dimensions Name=TaskId,Value=$TASK_ID Name=ClusterName,Value=$CLUSTER --statistics Average Maximum --period 60 --start-time $START_TIME --end-time $END_TIME --output json"
 echo "DEBUG: Executing: $CMD_MEM"
+echo "$CMD_MEM" >> cmds.txt
 $CMD_MEM > "$TEMP_DIR/memory.json"
 
 # Combine into one output (Constructing minimal task object)
