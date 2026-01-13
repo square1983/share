@@ -48,29 +48,17 @@ get_lambda_insights() {
 get_ecs_metric() {
     local CLUSTER=$1
     local TASK_ID=$2
-    local OUTPUT_FILE=$3
+    local START_TIME=$3
+    local END_TIME=$4
+    local OUTPUT_FILE=$5
 
-    if [ -z "$CLUSTER" ] || [ -z "$TASK_ID" ] || [ -z "$OUTPUT_FILE" ]; then
-        echo "エラー: get_ecs_metric 引数が不足しています"
+    if [ -z "$CLUSTER" ] || [ -z "$TASK_ID" ] || [ -z "$START_TIME" ] || [ -z "$END_TIME" ] || [ -z "$OUTPUT_FILE" ]; then
+        echo "エラー: get_ecs_metric 引数が不足しています (CLUSTER TASK_ID START_TIME END_TIME OUTPUT_FILE)"
         return 1
     fi
 
     local TEMP_DIR=$(dirname "$OUTPUT_FILE")/temp_ecs_${TASK_ID}
     mkdir -p "$TEMP_DIR"
-
-    # 1. タスク詳細を取得して開始/終了時間を決定
-    aws ecs describe-tasks \
-      --cluster "$CLUSTER" \
-      --tasks "$TASK_ID" \
-      --output json \
-      > "$TEMP_DIR/task_details.json"
-
-    local START_TIME=$(jq -r '.tasks[0].startedAt // .tasks[0].createdAt' "$TEMP_DIR/task_details.json")
-    local END_TIME=$(jq -r '.tasks[0].stoppedAt // empty' "$TEMP_DIR/task_details.json")
-
-    if [ -z "$END_TIME" ] || [ "$END_TIME" == "null" ]; then
-        END_TIME=$(date -u +"%Y-%m-%dT%H:%M:%SZ")
-    fi
 
     echo "   (ECS) タスク $TASK_ID ($START_TIME から $END_TIME) のメトリクスを取得中..."
 
@@ -97,11 +85,14 @@ get_ecs_metric() {
         --output json \
         > "$TEMP_DIR/memory.json"
 
-    # 3. 結合
-    jq -n --slurpfile task "$TEMP_DIR/task_details.json" \
+    # 3. 結合 (Construct a minimal task object since we don't call describe-tasks)
+    jq -n --arg cluster "$CLUSTER" --arg taskArn "$TASK_ID" --arg start "$START_TIME" --arg stop "$END_TIME" \
           --slurpfile cpu "$TEMP_DIR/cpu.json" \
           --slurpfile memory "$TEMP_DIR/memory.json" \
-          '{ task: $task[0].tasks[0], metrics: { cpu: $cpu[0], memory: $memory[0] } }' \
+          '{ 
+             task: { clusterArn: $cluster, taskArn: $taskArn, startedAt: $start, stoppedAt: $stop }, 
+             metrics: { cpu: $cpu[0], memory: $memory[0] } 
+           }' \
           > "$OUTPUT_FILE"
 
     rm -rf "$TEMP_DIR"
@@ -241,7 +232,12 @@ jq -r '.steps[] | @base64' "$BASE_DIR/index.json" | while read -r step_b64; do
     elif [ "$TYPE" == "ecs" ]; then
         CLUSTER=$(_jq '.clusterArn')
         TASK_ID=$(_jq '.taskId')
-        get_ecs_metric "$CLUSTER" "$TASK_ID" "$METRICS_DIR/ecs_${SAFE_STEP_NAME}.json" || echo "      ECSメトリクスの取得に失敗しました"
+        START_TIME=$(_jq '.startTime')
+        END_TIME=$(_jq '.endTime')
+        # If END_TIME is null (e.g. running?), default to now or handle it. 
+        # But sf_parser usually provides timestamps.
+        
+        get_ecs_metric "$CLUSTER" "$TASK_ID" "$START_TIME" "$END_TIME" "$METRICS_DIR/ecs_${SAFE_STEP_NAME}.json" || echo "      ECSメトリクスの取得に失敗しました"
 
     elif [ "$TYPE" == "glue" ]; then
         JOB_NAME=$(_jq '.jobName')
