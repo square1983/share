@@ -4,7 +4,14 @@ import csv
 import sys
 import glob
 import pandas as pd
+import logging
 from datetime import datetime
+
+# Configure logging
+logging.basicConfig(
+    level=logging.INFO,
+    format='%(asctime)s - %(levelname)s - %(message)s'
+)
 
 def parse_ecs_json(file_path):
     """
@@ -37,7 +44,7 @@ def parse_ecs_json(file_path):
                     stop_dt = datetime.fromisoformat(stop_str.replace('Z', '+00:00'))
                     duration_seconds = (stop_dt - start_dt).total_seconds()
                 except Exception as e:
-                    print(f"Warning: could not parse dates in {file_path}: {e}")
+                    logging.warning(f"Could not parse dates in {file_path}: {e}")
         
         metrics['duration'] = duration_seconds
 
@@ -94,8 +101,12 @@ def parse_ecs_json(file_path):
              
         return metrics
 
+    except json.JSONDecodeError:
+        # Silently skip empty or invalid JSON files to avoid cluttering output
+        logging.debug(f"Skipping empty/invalid JSON: {file_path}")
+        return None
     except Exception as e:
-        print(f"Error reading ECS file {file_path}: {e}")
+        logging.error(f"Error reading ECS file {file_path}: {e}")
         return None
 
 def parse_glue_json(file_path):
@@ -130,8 +141,11 @@ def parse_glue_json(file_path):
                     
         return metrics
 
+    except json.JSONDecodeError:
+        logging.debug(f"Skipping empty/invalid JSON: {file_path}")
+        return None
     except Exception as e:
-        print(f"Error reading {file_path}: {e}")
+        logging.error(f"Error reading Glue file {file_path}: {e}")
         return None
 
 def parse_lambda_json(file_path):
@@ -156,8 +170,11 @@ def parse_lambda_json(file_path):
                         }
                     except (json.JSONDecodeError, TypeError):
                         continue
+    except json.JSONDecodeError:
+        logging.debug(f"Skipping empty/invalid JSON: {file_path}")
+        return None
     except Exception as e:
-        print(f"Error reading {file_path}: {e}")
+        logging.error(f"Error reading Lambda file {file_path}: {e}")
         return None
     return None
 
@@ -169,7 +186,9 @@ def main_excel(root_dir, output_file):
     all_lambda_functions = set()
     all_ecs_tasks = set()
 
-    print(f"Scanning directory: {root_dir} ...")
+    all_ecs_tasks = set()
+
+    logging.info(f"Scanning directory: {root_dir} ...")
 
     # Walk through the directory tree
     for root, dirs, files in os.walk(root_dir):
@@ -203,6 +222,7 @@ def main_excel(root_dir, output_file):
                 if metrics:
                     all_data[execution_id][job_name] = {'type': 'glue', 'metrics': metrics}
                     all_glue_jobs.add(job_name)
+                    logging.debug(f"Loaded Glue metrics for {job_name} in {execution_id}")
 
             # Process Lambda files
             lambda_files = glob.glob(os.path.join(root, "lambda_*.json"))
@@ -216,6 +236,7 @@ def main_excel(root_dir, output_file):
                 if metrics:
                     all_data[execution_id][lambda_name] = {'type': 'lambda', 'metrics': metrics}
                     all_lambda_functions.add(lambda_name)
+                    logging.debug(f"Loaded Lambda metrics for {lambda_name} in {execution_id}")
 
             # Process ECS files
             ecs_files = glob.glob(os.path.join(root, "ecs_*.json"))
@@ -229,14 +250,16 @@ def main_excel(root_dir, output_file):
                 if metrics:
                      all_data[execution_id][task_name] = {'type': 'ecs', 'metrics': metrics}
                      all_ecs_tasks.add(task_name)
+                     logging.debug(f"Loaded ECS metrics for {task_name} in {execution_id}")
 
     # Sort names
     sorted_glue = sorted(list(all_glue_jobs))
     sorted_lambda = sorted(list(all_lambda_functions))
     sorted_ecs = sorted(list(all_ecs_tasks))
     
-    print(f"Found {len(sorted_glue)} Glue jobs, {len(sorted_lambda)} Lambda functions, {len(sorted_ecs)} ECS tasks.")
-    print(f"Found {len(all_data)} executions.")
+    # Only print names if execution is successful
+    logging.info(f"Found {len(sorted_glue)} Glue jobs, {len(sorted_lambda)} Lambda functions, {len(sorted_ecs)} ECS tasks.")
+    logging.info(f"Found {len(all_data)} executions.")
 
     # Prepare DataFrame rows
     rows = []
@@ -302,13 +325,13 @@ def main_excel(root_dir, output_file):
     # Write to Excel
     try:
         df.to_excel(output_file, index=False)
-        print(f"Excel successfully written to: {output_file}")
+        logging.info(f"Excel successfully written to: {output_file}")
     except Exception as e:
-        print(f"Error writing to Excel: {e}")
+        logging.error(f"Error writing to Excel: {e}")
 
 if __name__ == "__main__":
     if len(sys.argv) < 2:
-        print("Usage: python metrics.py <work_directory> [output.xlsx]")
+        logging.error("Usage: python metrics.py <work_directory> [output.xlsx]")
         sys.exit(1)
         
     work_dir = sys.argv[1]
