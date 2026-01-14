@@ -51,7 +51,7 @@ def parse_ecs_json(file_path):
         # Helper to process Datapoints
         def process_datapoints(dp_list):
             if not isinstance(dp_list, list) or len(dp_list) == 0:
-                return None, None
+                return None, None, None
             # Sort by Timestamp
             try:
                 sorted_dp = sorted(dp_list, key=lambda x: x.get('Timestamp', ''))
@@ -59,7 +59,8 @@ def parse_ecs_json(file_path):
                 sorted_dp = dp_list
 
             max_avg = 0.0
-            series_parts = []
+            avg_parts = []
+            max_parts = []
             
             for dp in sorted_dp:
                 avg_val = dp.get('Average', 0.0)
@@ -68,10 +69,10 @@ def parse_ecs_json(file_path):
                 if avg_val > max_avg:
                     max_avg = avg_val
                 
-                # Format "Avg/Max"
-                series_parts.append(f"{avg_val:.2f}/{max_val:.2f}")
+                avg_parts.append(f"{avg_val:.2f}")
+                max_parts.append(f"{max_val:.2f}")
                 
-            return max_avg, ", ".join(series_parts)
+            return max_avg, ", ".join(avg_parts), ", ".join(max_parts)
 
         # 2. Extract CPU
         if 'metrics' in data and 'cpu' in data['metrics']:
@@ -81,23 +82,27 @@ def parse_ecs_json(file_path):
             # So data['metrics']['cpu'] should have 'Datapoints'
             cpu_obj = data['metrics']['cpu']
             cpu_dps = cpu_obj.get('Datapoints', [])
-            c_max_avg, c_series = process_datapoints(cpu_dps)
+            c_max_avg, c_avg_series, c_max_series = process_datapoints(cpu_dps)
             metrics['cpu_max_avg'] = c_max_avg
-            metrics['cpu_series'] = c_series
+            metrics['cpu_avg_series'] = c_avg_series
+            metrics['cpu_max_series'] = c_max_series
         else:
              metrics['cpu_max_avg'] = None
-             metrics['cpu_series'] = None
+             metrics['cpu_avg_series'] = None
+             metrics['cpu_max_series'] = None
 
         # 3. Extract Memory
         if 'metrics' in data and 'memory' in data['metrics']:
             mem_obj = data['metrics']['memory']
             mem_dps = mem_obj.get('Datapoints', [])
-            m_max_avg, m_series = process_datapoints(mem_dps)
+            m_max_avg, m_avg_series, m_max_series = process_datapoints(mem_dps)
             metrics['mem_max_avg'] = m_max_avg
-            metrics['mem_series'] = m_series
+            metrics['mem_avg_series'] = m_avg_series
+            metrics['mem_max_series'] = m_max_series
         else:
              metrics['mem_max_avg'] = None
-             metrics['mem_series'] = None
+             metrics['mem_avg_series'] = None
+             metrics['mem_max_series'] = None
              
         return metrics
 
@@ -309,14 +314,18 @@ def main_excel(root_dir, output_file):
                 e_row[f"{ename}_Duration"] = m.get('duration')
                 e_row[f"{ename}_CPU_MaxAvg"] = m.get('cpu_max_avg')
                 e_row[f"{ename}_Mem_MaxAvg"] = m.get('mem_max_avg')
-                e_row[f"{ename}_CPU_TimeSeries"] = m.get('cpu_series')
-                e_row[f"{ename}_Mem_TimeSeries"] = m.get('mem_series')
+                e_row[f"{ename}_CPU_Avg_TimeSeries"] = m.get('cpu_avg_series')
+                e_row[f"{ename}_CPU_Max_TimeSeries"] = m.get('cpu_max_series')
+                e_row[f"{ename}_Mem_Avg_TimeSeries"] = m.get('mem_avg_series')
+                e_row[f"{ename}_Mem_Max_TimeSeries"] = m.get('mem_max_series')
             else:
                 e_row[f"{ename}_Duration"] = None
                 e_row[f"{ename}_CPU_MaxAvg"] = None
                 e_row[f"{ename}_Mem_MaxAvg"] = None
-                e_row[f"{ename}_CPU_TimeSeries"] = None
-                e_row[f"{ename}_Mem_TimeSeries"] = None
+                e_row[f"{ename}_CPU_Avg_TimeSeries"] = None
+                e_row[f"{ename}_CPU_Max_TimeSeries"] = None
+                e_row[f"{ename}_Mem_Avg_TimeSeries"] = None
+                e_row[f"{ename}_Mem_Max_TimeSeries"] = None
         ecs_rows.append(e_row)
 
     # Create DataFrames
