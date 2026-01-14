@@ -1,0 +1,43 @@
+{
+    "task": {
+        "clusterArn": "arn:aws:ecs:region:account:cluster/cluster-name",
+        "taskArn": "arn:aws:ecs:region:account:task/cluster-name/task-id",
+        "startedAt": "2026-01-08T02:10:00+00:00",
+        "stoppedAt": "2026-01-08T02:30:00+00:00",
+        "family": "my-task-family"
+    },
+    "metrics": {
+        "cpu": {
+            "Datapoints": [
+                {
+                    "Timestamp": "2026-01-08T02:15:00+00:00",
+                    "Average": 10.5,
+                    "Maximum": 20.0,
+                    "Unit": "Percent"
+                },
+                {
+                    "Timestamp": "2026-01-08T02:20:00+00:00",
+                    "Average": 50.0,
+                    "Maximum": 80.0,
+                    "Unit": "Percent"
+                },
+                {
+                    "Timestamp": "2026-01-08T02:10:00+00:00",
+                    "Average": 5.0,
+                    "Maximum": 10.0,
+                    "Unit": "Percent"
+                }
+            ]
+        },
+        "memory": {
+            "Datapoints": [
+                {
+                    "Timestamp": "2026-01-08T02:15:00+00:00",
+                    "Average": 30.0,
+                    "Maximum": 35.0,
+                    "Unit": "Percent"
+                }
+            ]
+        }
+    }
+}

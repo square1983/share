@@ -1,0 +1,8 @@
+{
+    "events": [
+        {
+            "timestamp": 123456789,
+            "message": "{\"cpu_total_time\": 16, \"duration\": 1248, \"memory_utilization\": 79}"
+        }
+    ]
+}
