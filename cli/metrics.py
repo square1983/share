@@ -186,8 +186,6 @@ def main_excel(root_dir, output_file):
     all_lambda_functions = set()
     all_ecs_tasks = set()
 
-    all_ecs_tasks = set()
-
     logging.info(f"Scanning directory: {root_dir} ...")
 
     # Walk through the directory tree
@@ -262,69 +260,88 @@ def main_excel(root_dir, output_file):
     logging.info(f"Found {len(all_data)} executions.")
 
     # Prepare DataFrame rows
-    rows = []
+    glue_rows = []
+    lambda_rows = []
+    ecs_rows = []
+    
     sorted_executions = sorted(all_data.keys())
     
     for exec_id in sorted_executions:
-        row_data = {'ExecutionId': exec_id}
         exec_data = all_data[exec_id]
         
-        # Glue Data
+        # --- Glue Data ---
+        g_row = {'ExecutionId': exec_id}
         for gname in sorted_glue:
             item = exec_data.get(gname)
             if item and item['type'] == 'glue':
                 m = item['metrics']
-                row_data[f"Glue_{gname}_cpu_avg"] = m.get('cpu_load_avg')
-                row_data[f"Glue_{gname}_mem_avg"] = m.get('memory_used_avg')
-                row_data[f"Glue_{gname}_exec_time"] = m.get('execution_time')
+                # Shorten column names for readability in Excel
+                g_row[f"{gname}_cpu_avg"] = m.get('cpu_load_avg')
+                g_row[f"{gname}_mem_avg"] = m.get('memory_used_avg')
+                g_row[f"{gname}_exec_time"] = m.get('execution_time')
             else:
-                row_data[f"Glue_{gname}_cpu_avg"] = None
-                row_data[f"Glue_{gname}_mem_avg"] = None
-                row_data[f"Glue_{gname}_exec_time"] = None
+                g_row[f"{gname}_cpu_avg"] = None
+                g_row[f"{gname}_mem_avg"] = None
+                g_row[f"{gname}_exec_time"] = None
+        glue_rows.append(g_row)
         
-        # Lambda Data
+        # --- Lambda Data ---
+        l_row = {'ExecutionId': exec_id}
         for lname in sorted_lambda:
             item = exec_data.get(lname)
             if item and item['type'] == 'lambda':
                 m = item['metrics']
-                row_data[f"Lambda_{lname}_cpu_total"] = m.get('cpu_total_time')
-                row_data[f"Lambda_{lname}_mem_util"] = m.get('memory_utilization')
-                row_data[f"Lambda_{lname}_duration"] = m.get('duration')
+                l_row[f"{lname}_cpu_total"] = m.get('cpu_total_time')
+                l_row[f"{lname}_mem_util"] = m.get('memory_utilization')
+                l_row[f"{lname}_duration"] = m.get('duration')
             else:
-                row_data[f"Lambda_{lname}_cpu_total"] = None
-                row_data[f"Lambda_{lname}_mem_util"] = None
-                row_data[f"Lambda_{lname}_duration"] = None
+                l_row[f"{lname}_cpu_total"] = None
+                l_row[f"{lname}_mem_util"] = None
+                l_row[f"{lname}_duration"] = None
+        lambda_rows.append(l_row)
                 
-        # ECS Data
+        # --- ECS Data ---
+        e_row = {'ExecutionId': exec_id}
         for ename in sorted_ecs:
             item = exec_data.get(ename)
             if item and item['type'] == 'ecs':
                 m = item['metrics']
-                row_data[f"ECS_{ename}_Duration"] = m.get('duration')
-                row_data[f"ECS_{ename}_CPU_MaxAvg"] = m.get('cpu_max_avg')
-                row_data[f"ECS_{ename}_Mem_MaxAvg"] = m.get('mem_max_avg')
-                row_data[f"ECS_{ename}_CPU_TimeSeries"] = m.get('cpu_series')
-                row_data[f"ECS_{ename}_Mem_TimeSeries"] = m.get('mem_series')
+                e_row[f"{ename}_Duration"] = m.get('duration')
+                e_row[f"{ename}_CPU_MaxAvg"] = m.get('cpu_max_avg')
+                e_row[f"{ename}_Mem_MaxAvg"] = m.get('mem_max_avg')
+                e_row[f"{ename}_CPU_TimeSeries"] = m.get('cpu_series')
+                e_row[f"{ename}_Mem_TimeSeries"] = m.get('mem_series')
             else:
-                row_data[f"ECS_{ename}_Duration"] = None
-                row_data[f"ECS_{ename}_CPU_MaxAvg"] = None
-                row_data[f"ECS_{ename}_Mem_MaxAvg"] = None
-                row_data[f"ECS_{ename}_CPU_TimeSeries"] = None
-                row_data[f"ECS_{ename}_Mem_TimeSeries"] = None
-        
-        # Append to rows list
-        rows.append(row_data)
+                e_row[f"{ename}_Duration"] = None
+                e_row[f"{ename}_CPU_MaxAvg"] = None
+                e_row[f"{ename}_Mem_MaxAvg"] = None
+                e_row[f"{ename}_CPU_TimeSeries"] = None
+                e_row[f"{ename}_Mem_TimeSeries"] = None
+        ecs_rows.append(e_row)
 
-    df = pd.DataFrame(rows)
+    # Create DataFrames
+    df_glue = pd.DataFrame(glue_rows)
+    df_lambda = pd.DataFrame(lambda_rows)
+    df_ecs = pd.DataFrame(ecs_rows)
     
-    if not df.empty:
-        # Reorder columns to have ExecutionId first
-        cols = ['ExecutionId'] + [c for c in df.columns if c != 'ExecutionId']
-        df = df[cols]
+    # Reorder columns to put ExecutionId first (if not empty)
+    if not df_glue.empty:
+        cols = ['ExecutionId'] + [c for c in df_glue.columns if c != 'ExecutionId']
+        df_glue = df_glue[cols]
+    if not df_lambda.empty:
+        cols = ['ExecutionId'] + [c for c in df_lambda.columns if c != 'ExecutionId']
+        df_lambda = df_lambda[cols]
+    if not df_ecs.empty:
+        cols = ['ExecutionId'] + [c for c in df_ecs.columns if c != 'ExecutionId']
+        df_ecs = df_ecs[cols]
     
-    # Write to Excel
+    # Write to Excel with multiple sheets
     try:
-        df.to_excel(output_file, index=False)
+        with pd.ExcelWriter(output_file, engine='openpyxl') as writer:
+            df_glue.to_excel(writer, sheet_name='Glue', index=False)
+            df_lambda.to_excel(writer, sheet_name='Lambda', index=False)
+            df_ecs.to_excel(writer, sheet_name='ECS', index=False)
+            
         logging.info(f"Excel successfully written to: {output_file}")
     except Exception as e:
         logging.error(f"Error writing to Excel: {e}")
