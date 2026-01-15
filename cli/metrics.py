@@ -38,6 +38,9 @@ def parse_ecs_json(file_path):
         with open(file_path, 'r', encoding='utf-8') as f:
             data = json.load(f)
             
+        if data is None:
+            return None
+            
         metrics = {}
         
         # 1. Calculation Duration (from task.startedAt / stoppedAt)
@@ -136,16 +139,22 @@ def parse_glue_json(file_path):
     """
     try:
         with open(file_path, 'r', encoding='utf-8') as f:
+        with open(file_path, 'r', encoding='utf-8') as f:
             data = json.load(f)
+
+        if data is None:
+            return None
             
         metrics = {}
         
         # Extract ExecutionTime from jobRun
-        if 'jobRun' in data:
-            metrics['execution_time'] = data['jobRun'].get('ExecutionTime')
+        # data.get('jobRun') can be None
+        job_run = data.get('jobRun')
+        if job_run and isinstance(job_run, dict):
+            metrics['execution_time'] = job_run.get('ExecutionTime')
             
         # Check for metrics.cpuLoad.Datapoints[0].Average
-        if 'metrics' in data:
+        if 'metrics' in data and data['metrics']:
             m = data['metrics']
             
             # CPU Load
@@ -178,10 +187,14 @@ def parse_lambda_json(file_path):
     """
     try:
         with open(file_path, 'r', encoding='utf-8') as f:
+        with open(file_path, 'r', encoding='utf-8') as f:
             data = json.load(f)
             
+        if data is None:
+            return None
+            
         # Try to find the event with the message
-        if 'events' in data:
+        if 'events' in data and data['events']:
             for event in data['events']:
                 if 'message' in event:
                     try:
