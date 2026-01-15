@@ -5,6 +5,7 @@ import sys
 import glob
 import pandas as pd
 import logging
+import re
 from datetime import datetime
 
 # Configure logging
@@ -12,6 +13,14 @@ logging.basicConfig(
     level=logging.INFO,
     format='%(asctime)s - %(levelname)s - %(message)s'
 )
+
+def natural_sort_key(s):
+    """
+    Key function for natural sorting (e.g., C-2 before C-10).
+    Splits string into text and numbers.
+    """
+    return [int(text) if text.isdigit() else text.lower()
+            for text in re.split('([0-9]+)', s)]
 
 def parse_ecs_json(file_path):
     """
@@ -256,9 +265,9 @@ def main_excel(root_dir, output_file):
                      logging.debug(f"Loaded ECS metrics for {task_name} in {execution_id}")
 
     # Sort names
-    sorted_glue = sorted(list(all_glue_jobs))
-    sorted_lambda = sorted(list(all_lambda_functions))
-    sorted_ecs = sorted(list(all_ecs_tasks))
+    sorted_glue = sorted(list(all_glue_jobs), key=natural_sort_key)
+    sorted_lambda = sorted(list(all_lambda_functions), key=natural_sort_key)
+    sorted_ecs = sorted(list(all_ecs_tasks), key=natural_sort_key)
     
     # Only print names if execution is successful
     logging.info(f"Found {len(sorted_glue)} Glue jobs, {len(sorted_lambda)} Lambda functions, {len(sorted_ecs)} ECS tasks.")
