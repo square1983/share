@@ -13,6 +13,8 @@ logging.basicConfig(
     level=logging.INFO,
     format='%(asctime)s - %(levelname)s - %(message)s'
 )
+def format_percent(num):
+    return f"{num:.2f}%"
 
 def natural_sort_key(s):
     """
@@ -60,7 +62,7 @@ def parse_ecs_json(file_path):
         # Helper to process Datapoints
         def process_datapoints(dp_list):
             if not isinstance(dp_list, list) or len(dp_list) == 0:
-                return None, None, None
+                return None, None, None, []
             # Sort by Timestamp
             try:
                 sorted_dp = sorted(dp_list, key=lambda x: x.get('Timestamp', ''))
@@ -81,7 +83,7 @@ def parse_ecs_json(file_path):
                 avg_parts.append(f"{avg_val:.2f}")
                 max_parts.append(f"{max_val:.2f}")
                 
-            return max_avg, ", ".join(avg_parts), ", ".join(max_parts)
+            return max_avg, ", ".join(avg_parts), ", ".join(max_parts), sorted_dp
 
         # 2. Extract CPU
         if 'metrics' in data and 'cpu' in data['metrics']:
@@ -89,29 +91,34 @@ def parse_ecs_json(file_path):
             # exe.sh: --slurpfile cpu "$TEMP_DIR/cpu.json" -> metrics: { cpu: $cpu[0] }
             # If cpu.json content is { "Datapoints": ... } then $cpu[0] is that object.
             # So data['metrics']['cpu'] should have 'Datapoints'
+            # So data['metrics']['cpu'] should have 'Datapoints'
             cpu_obj = data['metrics']['cpu']
             cpu_dps = cpu_obj.get('Datapoints', [])
-            c_max_avg, c_avg_series, c_max_series = process_datapoints(cpu_dps)
+            c_max_avg, c_avg_series, c_max_series, c_raw = process_datapoints(cpu_dps)
             metrics['cpu_max_avg'] = c_max_avg
             metrics['cpu_avg_series'] = c_avg_series
             metrics['cpu_max_series'] = c_max_series
+            metrics['cpu_raw'] = c_raw
         else:
              metrics['cpu_max_avg'] = None
              metrics['cpu_avg_series'] = None
              metrics['cpu_max_series'] = None
+             metrics['cpu_raw'] = []
 
         # 3. Extract Memory
         if 'metrics' in data and 'memory' in data['metrics']:
             mem_obj = data['metrics']['memory']
             mem_dps = mem_obj.get('Datapoints', [])
-            m_max_avg, m_avg_series, m_max_series = process_datapoints(mem_dps)
+            m_max_avg, m_avg_series, m_max_series, m_raw = process_datapoints(mem_dps)
             metrics['mem_max_avg'] = m_max_avg
             metrics['mem_avg_series'] = m_avg_series
             metrics['mem_max_series'] = m_max_series
+            metrics['mem_raw'] = m_raw
         else:
              metrics['mem_max_avg'] = None
              metrics['mem_avg_series'] = None
              metrics['mem_max_series'] = None
+             metrics['mem_raw'] = []
              
         return metrics
 
@@ -146,12 +153,15 @@ def parse_glue_json(file_path):
                 dp = m['cpuLoad']['Datapoints']
                 if isinstance(dp, list) and len(dp) > 0:
                     metrics['cpu_load_avg'] = dp[0].get('Average')
+                    metrics['cpu_raw'] = sorted(dp, key=lambda x: x.get('Timestamp', ''))
             
             # Memory Used
             if 'memoryUsed' in m and 'Datapoints' in m['memoryUsed']:
                 dp = m['memoryUsed']['Datapoints']
                 if isinstance(dp, list) and len(dp) > 0:
                     metrics['memory_used_avg'] = dp[0].get('Average')
+                    metrics['mem_raw'] = sorted(dp, key=lambda x: x.get('Timestamp', ''))
+                    metrics['mem_raw'] = sorted(dp, key=lambda x: x.get('Timestamp', ''))
                     
         return metrics
 
@@ -264,6 +274,35 @@ def main_excel(root_dir, output_file):
                      all_ecs_tasks.add(task_name)
                      logging.debug(f"Loaded ECS metrics for {task_name} in {execution_id}")
 
+                     logging.debug(f"Loaded ECS metrics for {task_name} in {execution_id}")
+
+    # Load Step Name Mapping from index.json (if exists)
+    step_mapping = {}
+    index_file = os.path.join(root_dir, "index.json")
+    if os.path.exists(index_file):
+        logging.info(f"Loading step mapping from: {index_file}")
+        try:
+            with open(index_file, 'r', encoding='utf-8') as f:
+                index_data = json.load(f)
+                if isinstance(index_data, dict) and 'steps' in index_data:
+                    for step in index_data['steps']:
+                        s_name = step.get('stepName', '')
+                        t_type = step.get('type', '')
+                        
+                        if t_type == 'ecs':
+                            # key by task_name (which is typically taskId or part of Arn)
+                            # parser.jq extracts 'taskId'
+                            tid = step.get('taskId', '')
+                            if tid and tid != 'UNKNOWN':
+                                step_mapping[f"ecs_{tid}"] = s_name
+                        elif t_type == 'glue':
+                            # parser.jq extracts 'jobName'
+                            jname = step.get('jobName', '')
+                            if jname and jname != 'UNKNOWN':
+                                step_mapping[f"glue_{jname}"] = s_name
+        except Exception as e:
+            logging.warning(f"Could not load index.json for step mapping: {e}")
+
     # Sort names
     sorted_glue = sorted(list(all_glue_jobs), key=natural_sort_key)
     sorted_lambda = sorted(list(all_lambda_functions), key=natural_sort_key)
@@ -337,10 +376,72 @@ def main_excel(root_dir, output_file):
                 e_row[f"{ename}_Mem_Max_TimeSeries"] = None
         ecs_rows.append(e_row)
 
+    # --- Generate Detail DataFrames ---
+    
+    def get_detail_rows_flat(resource_type, sorted_names):
+        detail_rows = []
+        
+        for exec_id in sorted_executions:
+            exec_data = all_data[exec_id]
+            
+            for name in sorted_names:
+                item = exec_data.get(name)
+                # Check if item exists and matches resource type
+                if item and item.get('type') == resource_type and 'metrics' in item:
+                    m = item['metrics']
+                    # Look up Step Name
+                    step_key = f"{resource_type}_{name}"
+                    step_name = step_mapping.get(step_key, "")
+                    
+                    row = {
+                        'ExecutionId': exec_id,
+                        'ResourceName': name,
+                        'StepName': step_name
+                    }
+                    
+                    # Gather raw data
+                    # ecs: cpu_raw, mem_raw
+                    # glue: cpu_raw, mem_raw
+                    cpu_raw = m.get('cpu_raw', [])
+                    mem_raw = m.get('mem_raw', [])
+                    
+                    # Merge timestamps
+                    all_timestamps = set()
+                    if cpu_raw:
+                        for dp in cpu_raw:
+                            all_timestamps.add(dp.get('Timestamp'))
+                    if mem_raw:
+                        for dp in mem_raw:
+                            all_timestamps.add(dp.get('Timestamp'))
+                            
+                    sorted_ts = sorted([ts for ts in all_timestamps if ts])
+                    
+                    # Create Lookup
+                    cpu_map = {dp.get('Timestamp'): dp.get('Average') for dp in cpu_raw if dp.get('Timestamp')}
+                    mem_map = {dp.get('Timestamp'): dp.get('Average') for dp in mem_raw if dp.get('Timestamp')}
+                    
+                    # Add to row
+                    # Format: Time1, CPU1, Mem1, Time2, CPU2, Mem2
+                    for i, ts in enumerate(sorted_ts):
+                        # Convert ISO timestamp to more readable format if needed? 
+                        # Keeping raw string for now usually safe.
+                        row[f"Time_{i+1}"] = ts
+                        row[f"CPU_{i+1}"] = cpu_map.get(ts)
+                        row[f"Mem_{i+1}"] = mem_map.get(ts)
+                        
+                    detail_rows.append(row)
+        return detail_rows
+
+    detail_glue_rows = get_detail_rows_flat('glue', sorted_glue)
+    detail_ecs_rows = get_detail_rows_flat('ecs', sorted_ecs)
+    
     # Create DataFrames
     df_glue = pd.DataFrame(glue_rows)
     df_lambda = pd.DataFrame(lambda_rows)
     df_ecs = pd.DataFrame(ecs_rows)
+    
+    df_detail_glue = pd.DataFrame(detail_glue_rows)
+    df_detail_ecs = pd.DataFrame(detail_ecs_rows)
     
     # Reorder columns to put ExecutionId first (if not empty)
     if not df_glue.empty:
@@ -352,13 +453,76 @@ def main_excel(root_dir, output_file):
     if not df_ecs.empty:
         cols = ['ExecutionId'] + [c for c in df_ecs.columns if c != 'ExecutionId']
         df_ecs = df_ecs[cols]
+        
+    # Detail sorting
+    # We want ResourceName, StepName first
+    def reorder_detail(df):
+        if df.empty:
+            return df
+        # fixed cols
+        fixed = ['ExecutionId', 'ResourceName', 'StepName']
+        # dynamic cols (Time_1, CPU_1, Mem_1 ...) sort by index number
+        dynamic = [c for c in df.columns if c not in fixed]
+        # Sort dynamic columns by the index suffix? 
+        # They naturally come in random order from dict? No, dict preserves insertion order in modern python, 
+        # but DataFrame creation might shuffle if we didn't use a list of sorted keys.
+        # However, our row dicts are constructed with keys in order: Time_1, CPU_1... 
+        # So pd.DataFrame(rows) usually respects that order.
+        # But to be safe, let's just ensure fixed are at front.
+        final_cols = []
+        for c in fixed:
+            if c in df.columns:
+                final_cols.append(c)
+        
+        # Sort rest by trying to extract number
+        def col_key(c):
+            parts = c.split('_')
+            # Assuming format Name_Index
+            if parts[-1].isdigit():
+                return int(parts[-1])
+            return 999999
+            
+        dynamic_sorted = sorted(dynamic, key=col_key)
+        
+        # BUT wait: Time_1, CPU_1, Mem_1. 
+        # If we sort purely by number, we get CPU_1, Mem_1, Time_1.
+        # We want grouped by index: Time_1, CPU_1, Mem_1.
+        def col_group_key(c):
+             # Returns (Index, TypePriority)
+             # TypePriority: Time=0, CPU=1, Mem=2
+             parts = c.split('_')
+             if parts[-1].isdigit():
+                 idx = int(parts[-1])
+                 kind = parts[0] # Time, CPU, Mem
+                 prio = 0
+                 if kind == 'Time': prio = 0
+                 elif kind == 'CPU': prio = 1
+                 elif kind == 'Mem': prio = 2
+                 return (idx, prio)
+             return (999999, 0)
+        
+        dynamic_sorted = sorted(dynamic, key=col_group_key)
+        
+        return df[final_cols + dynamic_sorted]
+
+    df_detail_glue = reorder_detail(df_detail_glue)
+    df_detail_ecs = reorder_detail(df_detail_ecs)
+    
+    logging.info("Generating DataFrames and writing to Excel...")
     
     # Write to Excel with multiple sheets
     try:
         with pd.ExcelWriter(output_file, engine='openpyxl') as writer:
+            logging.info("Writing sheet: Glue")
             df_glue.to_excel(writer, sheet_name='Glue', index=False)
+            logging.info("Writing sheet: Lambda")
             df_lambda.to_excel(writer, sheet_name='Lambda', index=False)
+            logging.info("Writing sheet: ECS")
             df_ecs.to_excel(writer, sheet_name='ECS', index=False)
+            logging.info("Writing sheet: Glue Detail")
+            df_detail_glue.to_excel(writer, sheet_name='Glue Detail', index=False)
+            logging.info("Writing sheet: ECS Detail")
+            df_detail_ecs.to_excel(writer, sheet_name='ECS Detail', index=False)
             
         logging.info(f"Excel successfully written to: {output_file}")
     except Exception as e:
