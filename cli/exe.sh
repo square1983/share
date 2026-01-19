@@ -26,6 +26,47 @@ echo "作業ディレクトリ: $BASE_DIR"
 # 関数定義
 # ==========================================
 
+adjust_time() {
+    local input=$1
+    local shift_mins=$2
+    
+    # input might be "2024-06-10T01:23:45.123Z" or "...+09:00"
+    
+    # 1. Handle "Z" (UTC) -> replace with +0000
+    local clean_input="$input"
+    if [[ "$input" == *Z ]]; then
+        clean_input="${input%Z}+0000"
+    else
+        # 2. Handle +09:00 -> +0900 (remove colon from last 6 chars)
+        if [[ "$input" =~ ([+-][0-9]{2}):([0-9]{2})$ ]]; then
+             clean_input=$(echo "$input" | sed 's/\([+-][0-9]\{2\}\):\([0-9]\{2\}\)$/\1\2/')
+        fi
+    fi
+    
+    # 3. Strip subseconds (.123)
+    local clean_input_simplified=$(echo "$clean_input" | sed -E 's/\.[0-9]+//')
+    
+    # 4. Convert to Epoch (macOS date)
+    local epoch=$(date -j -f "%Y-%m-%dT%H:%M:%S%z" "$clean_input_simplified" "+%s" 2>/dev/null)
+    
+    if [ -z "$epoch" ]; then
+        # Fallback: if date fails, return original (no shift)
+        echo "$input"
+        return
+    fi
+    
+    # 5. Shift
+    local new_epoch=$((epoch + (shift_mins * 60)))
+    
+    # 6. Format back to %Y-%m-%dT%H:%M:%S%z
+    local new_date=$(date -r "$new_epoch" "+%Y-%m-%dT%H:%M:%S%z")
+    
+    # 7. Insert colon back into timezone: +0900 -> +09:00
+    local final_date=$(echo "$new_date" | sed 's/\([+-][0-9]\{2\}\)\([0-9]\{2\}\)$/\1:\2/')
+    
+    echo "$final_date"
+}
+
 get_lambda_insights() {
     local REQUEST_ID=$1
     local OUTPUT_FILE=$2
@@ -120,9 +161,9 @@ get_glue_job_metric() {
     fi
 
     # Adjust Time Window (+/- 10 minutes)
-    # Using python for robust date math
-    ADJUSTED_START=$(python3 -c "from datetime import datetime, timedelta; t = datetime.fromisoformat('$START_TIME'.replace('Z', '+00:00')); print((t - timedelta(minutes=10)).isoformat())")
-    ADJUSTED_END=$(python3 -c "from datetime import datetime, timedelta; t = datetime.fromisoformat('$END_TIME'.replace('Z', '+00:00')); print((t + timedelta(minutes=10)).isoformat())")
+    # Using shell function adjust_time
+    ADJUSTED_START=$(adjust_time "$START_TIME" "-10")
+    ADJUSTED_END=$(adjust_time "$END_TIME" "10")
 
     echo "   (Glue) ジョブ $JOB_NAME / $RUN_ID ($START_TIME -> $END_TIME) を調整: ($ADJUSTED_START -> $ADJUSTED_END)"
 
