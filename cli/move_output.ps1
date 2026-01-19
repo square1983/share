@@ -39,12 +39,8 @@ foreach ($TargetDir in $TargetDirs) {
     foreach ($SourceDir in $SubDirs) {
         $DirName = $SourceDir.Name
         
-        # 3. Determine Destination Directory (First 6 chars)
-        if ($DirName.Length -lt 6) {
-            $ShortName = $DirName
-        } else {
-            $ShortName = $DirName.Substring(0, 6)
-        }
+        # 3. Determine Destination Directory (Full Hash Name)
+        $ShortName = $DirName
         
         $DestDir = Join-Path $BasePath $ShortName
         
