@@ -119,10 +119,16 @@ get_glue_job_metric() {
         END_TIME=$(date -u +"%Y-%m-%dT%H:%M:%SZ")
     fi
 
-    echo "   (Glue) ジョブ $JOB_NAME / $RUN_ID ($START_TIME から $END_TIME) のメトリクスを取得中..."
+    # Adjust Time Window (+/- 10 minutes)
+    # Using python for robust date math
+    ADJUSTED_START=$(python3 -c "from datetime import datetime, timedelta; t = datetime.fromisoformat('$START_TIME'.replace('Z', '+00:00')); print((t - timedelta(minutes=10)).isoformat())")
+    ADJUSTED_END=$(python3 -c "from datetime import datetime, timedelta; t = datetime.fromisoformat('$END_TIME'.replace('Z', '+00:00')); print((t + timedelta(minutes=10)).isoformat())")
+
+    echo "   (Glue) ジョブ $JOB_NAME / $RUN_ID ($START_TIME -> $END_TIME) を調整: ($ADJUSTED_START -> $ADJUSTED_END)"
 
     # 2. CloudWatch metrics
-    CMD_GLUE_CPU="aws cloudwatch get-metric-statistics --namespace Glue --metric-name glue.driver.cpuLoad --dimensions Name=JobName,Value=$JOB_NAME Name=JobRunId,Value=$RUN_ID Name=Type,Value=gauge --statistics Average Maximum --period 300 --start-time $START_TIME --end-time $END_TIME --output json"
+    # Use ADJUSTED_START and ADJUSTED_END
+    CMD_GLUE_CPU="aws cloudwatch get-metric-statistics --namespace Glue --metric-name glue.driver.cpuLoad --dimensions Name=JobName,Value=$JOB_NAME Name=JobRunId,Value=$RUN_ID Name=Type,Value=gauge --statistics Average Maximum --period 300 --start-time $ADJUSTED_START --end-time $ADJUSTED_END --output json"
     echo "$CMD_GLUE_CPU" >> cmds.txt
     aws cloudwatch get-metric-statistics \
         --namespace Glue \
@@ -130,12 +136,12 @@ get_glue_job_metric() {
         --dimensions Name=JobName,Value="$JOB_NAME" Name=JobRunId,Value="$RUN_ID" Name=Type,Value=gauge \
         --statistics Average Maximum \
         --period 300 \
-        --start-time "$START_TIME" \
-        --end-time "$END_TIME" \
+        --start-time "$ADJUSTED_START" \
+        --end-time "$ADJUSTED_END" \
         --output json \
         > "$TEMP_DIR/cpu_load.json"
 
-    CMD_GLUE_MEM="aws cloudwatch get-metric-statistics --namespace Glue --metric-name glue.driver.memoryUsed --dimensions Name=JobName,Value=$JOB_NAME Name=JobRunId,Value=$RUN_ID Name=Type,Value=gauge --statistics Average Maximum --period 300 --start-time $START_TIME --end-time $END_TIME --output json"
+    CMD_GLUE_MEM="aws cloudwatch get-metric-statistics --namespace Glue --metric-name glue.driver.memoryUsed --dimensions Name=JobName,Value=$JOB_NAME Name=JobRunId,Value=$RUN_ID Name=Type,Value=gauge --statistics Average Maximum --period 300 --start-time $ADJUSTED_START --end-time $ADJUSTED_END --output json"
     echo "$CMD_GLUE_MEM" >> cmds.txt
     aws cloudwatch get-metric-statistics \
          --namespace Glue \
@@ -143,8 +149,8 @@ get_glue_job_metric() {
          --dimensions Name=JobName,Value="$JOB_NAME" Name=JobRunId,Value="$RUN_ID" Name=Type,Value=gauge \
          --statistics Average Maximum \
          --period 300 \
-         --start-time "$START_TIME" \
-         --end-time "$END_TIME" \
+         --start-time "$ADJUSTED_START" \
+         --end-time "$ADJUSTED_END" \
          --output json \
          > "$TEMP_DIR/memory_used.json"
 

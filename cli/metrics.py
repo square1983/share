@@ -139,7 +139,6 @@ def parse_glue_json(file_path):
     """
     try:
         with open(file_path, 'r', encoding='utf-8') as f:
-        with open(file_path, 'r', encoding='utf-8') as f:
             data = json.load(f)
 
         if data is None:
@@ -170,7 +169,6 @@ def parse_glue_json(file_path):
                 if isinstance(dp, list) and len(dp) > 0:
                     metrics['memory_used_avg'] = dp[0].get('Average')
                     metrics['mem_raw'] = sorted(dp, key=lambda x: x.get('Timestamp', ''))
-                    metrics['mem_raw'] = sorted(dp, key=lambda x: x.get('Timestamp', ''))
                     
         return metrics
 
@@ -186,7 +184,6 @@ def parse_lambda_json(file_path):
     Parses a Lambda Insight JSON file to extract cpu, memory, and duration.
     """
     try:
-        with open(file_path, 'r', encoding='utf-8') as f:
         with open(file_path, 'r', encoding='utf-8') as f:
             data = json.load(f)
             
