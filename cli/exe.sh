@@ -30,37 +30,49 @@ adjust_time() {
     local input=$1
     local shift_mins=$2
     
-    # input might be "2024-06-10T01:23:45.123Z" or "...+09:00"
-    
-    # 1. Handle "Z" (UTC) -> replace with +0000
+    # 1. Clean input for universal parsing
+    # Handle "Z" -> "+0000"
     local clean_input="$input"
     if [[ "$input" == *Z ]]; then
         clean_input="${input%Z}+0000"
-    else
-        # 2. Handle +09:00 -> +0900 (remove colon from last 6 chars)
-        if [[ "$input" =~ ([+-][0-9]{2}):([0-9]{2})$ ]]; then
-             clean_input=$(echo "$input" | sed 's/\([+-][0-9]\{2\}\):\([0-9]\{2\}\)$/\1\2/')
-        fi
+    elif [[ "$input" =~ :[0-9]{2}$ ]]; then
+        # If matches :XX at end (timezone), strip colon for BSD compatibility 
+        # (GNU date handles both, usually)
+        clean_input=$(echo "$input" | sed 's/\(.*\):/\1/')
     fi
     
-    # 3. Strip subseconds (.123)
+    # Strip subseconds (.123) for robust parsing on both
     local clean_input_simplified=$(echo "$clean_input" | sed -E 's/\.[0-9]+//')
+
+    local epoch=""
     
-    # 4. Convert to Epoch (macOS date)
-    local epoch=$(date -j -f "%Y-%m-%dT%H:%M:%S%z" "$clean_input_simplified" "+%s" 2>/dev/null)
+    # 2. Try GNU date (Linux/CloudShell)
+    if date --version >/dev/null 2>&1; then
+        # GNU date uses -d
+        epoch=$(date -d "$clean_input_simplified" +%s 2>/dev/null)
+    else
+        # BSD date (macOS) uses -j -f
+        # Format expected: %Y-%m-%dT%H:%M:%S%z (since we stripped logic)
+        epoch=$(date -j -f "%Y-%m-%dT%H:%M:%S%z" "$clean_input_simplified" "+%s" 2>/dev/null)
+    fi
     
     if [ -z "$epoch" ]; then
-        # Fallback: if date fails, return original (no shift)
+        echo "Error parsing $input (cleaned: $clean_input_simplified)" >&2
         echo "$input"
         return
     fi
     
-    # 5. Shift
+    # 3. Shift
     local new_epoch=$((epoch + (shift_mins * 60)))
     
-    # 6. Format back to UTC (Z) using -u
-    # This avoids timezone formatting issues and ensures standard ISO 8601 for CloudWatch
-    date -u -r "$new_epoch" "+%Y-%m-%dT%H:%M:%SZ"
+    # 4. Format back to ISO 8601 UTC
+    if date --version >/dev/null 2>&1; then
+        # GNU date
+        date -u -d "@$new_epoch" "+%Y-%m-%dT%H:%M:%SZ"
+    else
+        # BSD date
+        date -u -r "$new_epoch" "+%Y-%m-%dT%H:%M:%SZ"
+    fi
 }
 
 get_lambda_insights() {
