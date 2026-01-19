@@ -58,13 +58,9 @@ adjust_time() {
     # 5. Shift
     local new_epoch=$((epoch + (shift_mins * 60)))
     
-    # 6. Format back to %Y-%m-%dT%H:%M:%S%z
-    local new_date=$(date -r "$new_epoch" "+%Y-%m-%dT%H:%M:%S%z")
-    
-    # 7. Insert colon back into timezone: +0900 -> +09:00
-    local final_date=$(echo "$new_date" | sed 's/\([+-][0-9]\{2\}\)\([0-9]\{2\}\)$/\1:\2/')
-    
-    echo "$final_date"
+    # 6. Format back to UTC (Z) using -u
+    # This avoids timezone formatting issues and ensures standard ISO 8601 for CloudWatch
+    date -u -r "$new_epoch" "+%Y-%m-%dT%H:%M:%SZ"
 }
 
 get_lambda_insights() {
