@@ -265,8 +265,20 @@ jq -r '.steps[] | @base64' "$BASE_DIR/index.json" | while read -r step_b64; do
         continue
     fi
     
+    # Generate Unique Filename
+    BASE_FILENAME="${METRICS_DIR}/${TYPE}_${SAFE_STEP_NAME}"
+    OUTPUT_FILE="${BASE_FILENAME}.json"
+    COUNTER=1
+    
+    while [ -f "$OUTPUT_FILE" ]; do
+        SUFFIX=$(printf "%02d" $COUNTER)
+        # Underscore before suffix as requested: name_01.json
+        OUTPUT_FILE="${BASE_FILENAME}_${SUFFIX}.json"
+        COUNTER=$((COUNTER + 1))
+    done
+    
     if [ "$MOCK_MODE" == "true" ]; then
-        echo "{\"mock\": true, \"step\": \"$STEP_NAME\"}" > "$METRICS_DIR/${TYPE}_${SAFE_STEP_NAME}.json"
+        echo "{\"mock\": true, \"step\": \"$STEP_NAME\"}" > "$OUTPUT_FILE"
         continue
     fi
 
@@ -279,7 +291,8 @@ jq -r '.steps[] | @base64' "$BASE_DIR/index.json" | while read -r step_b64; do
              RESOURCE_ID=$(_jq '.resource')
         fi
         
-        get_lambda_insights "$RESOURCE_ID" "$METRICS_DIR/lambda_${SAFE_STEP_NAME}.json" || echo "      Lambdaメトリクスの取得に失敗しました"
+
+        get_lambda_insights "$RESOURCE_ID" "$OUTPUT_FILE" || echo "      Lambdaメトリクスの取得に失敗しました"
 
     elif [ "$TYPE" == "ecs" ]; then
         CLUSTER=$(_jq '.clusterArn')
@@ -290,12 +303,14 @@ jq -r '.steps[] | @base64' "$BASE_DIR/index.json" | while read -r step_b64; do
         # If END_TIME is null (e.g. running?), default to now or handle it. 
         # But sf_parser usually provides timestamps.
         
-        get_ecs_metric "$CLUSTER" "$TASK_ID" "$START_TIME" "$END_TIME" "$FAMILY" "$METRICS_DIR/ecs_${SAFE_STEP_NAME}.json" || echo "      ECSメトリクスの取得に失敗しました"
+        # But sf_parser usually provides timestamps.
+        
+        get_ecs_metric "$CLUSTER" "$TASK_ID" "$START_TIME" "$END_TIME" "$FAMILY" "$OUTPUT_FILE" || echo "      ECSメトリクスの取得に失敗しました"
 
     elif [ "$TYPE" == "glue" ]; then
         JOB_NAME=$(_jq '.jobName')
         RUN_ID=$(_jq '.jobRunId')
-        get_glue_job_metric "$JOB_NAME" "$RUN_ID" "$METRICS_DIR/glue_${SAFE_STEP_NAME}.json" || echo "      Glueメトリクスの取得に失敗しました"
+        get_glue_job_metric "$JOB_NAME" "$RUN_ID" "$OUTPUT_FILE" || echo "      Glueメトリクスの取得に失敗しました"
         
     elif [ "$TYPE" == "step_function" ]; then
         EXEC_ARN=$(_jq '.executionArn')
