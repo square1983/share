@@ -1,0 +1,40 @@
+@startuml
+title Glue Sparkジョブの実行フロー（時系列図）
+
+actor "呼び出し元\nStep Functions / API / Console" as Caller
+participant "Glue Sparkジョブ\nDriver" as GlueJob
+database "Glue Catalog\nデータカタログ" as Catalog
+database "S3\nデータストレージ" as S3
+database "出力先\nParquet / CSV" as Output
+
+Caller -> GlueJob : 1. ジョブを起動\nsql / database / table / output_path 等を渡す
+
+activate GlueJob
+GlueJob -> GlueJob : 2. Spark / GlueContext を初期化
+
+GlueJob -> Catalog : 3. Catalogからテーブルメタデータを取得\nSchema / Partition / S3 Location
+activate Catalog
+Catalog --> GlueJob : 4. メタデータを返却
+deactivate Catalog
+
+GlueJob -> S3 : 5. S3からデータファイルを読み込み\nParquet / CSV など
+activate S3
+S3 --> GlueJob : 6. データを返却
+deactivate S3
+
+GlueJob -> GlueJob : 7. DynamicFrameをDataFrameに変換
+GlueJob -> GlueJob : 8. テンポラリビューを作成\ncreateOrReplaceTempView
+GlueJob -> GlueJob : 9. Spark SQLを実行
+GlueJob -> GlueJob : 10. 結果DataFrameを取得
+
+alt Parquet出力
+    GlueJob -> Output : 11a. Parquet形式でS3へ出力
+else CSV出力
+    GlueJob -> Output : 11b. CSV形式でS3へ出力
+end
+
+Output --> GlueJob : 12. 出力完了
+GlueJob --> Caller : 13. ジョブ実行完了 / ステータス返却
+deactivate GlueJob
+
+@enduml
