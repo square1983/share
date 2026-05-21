@@ -1,0 +1,15 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(mkdir -p /Users/yangjian/Documents/work/share/ibm/src/main/java/com/example/ibmcos/config)",
+      "Bash(mkdir -p /Users/yangjian/Documents/work/share/ibm/src/main/java/com/example/ibmcos/service)",
+      "Bash(mkdir -p /Users/yangjian/Documents/work/share/ibm/src/main/resources)",
+      "Bash(mkdir -p /Users/yangjian/Documents/work/share/ibm/src/test/java/com/example/ibmcos)",
+      "Bash(mvn compile *)",
+      "Bash(mvn test-compile *)",
+      "Bash(aws s3api *)",
+      "Bash(echo \"deleted: $?\")",
+      "Bash(COS_ENDPOINT=https://s3.ap-northeast-1.amazonaws.com COS_LOCATION=ap-northeast-1 COS_TEST_BUCKET=cos-enbango-test-1779352343 mvn test)"
+    ]
+  }
+}
