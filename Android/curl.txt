@@ -1,0 +1,8 @@
+curl -X POST "https://{LIQUID_API_DOMAIN}/{TOKEN_API_PATH}" \
+  -H "Content-Type: application/json" \
+  -H "x-api-key: {API_KEY}" \
+  -d '{
+    "external_user_id": "USER_123456",
+    "redirect_url": "https://your-domain.com/ekyc/complete",
+    "callback_url": "https://your-domain.com/api/ekyc/callback"
+  }'
