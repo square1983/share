@@ -1,0 +1,105 @@
+try {
+    ResponseEntity<String> response = restTemplate.exchange(
+            url,
+            HttpMethod.POST,
+            entity,
+            String.class
+    );
+
+    return response.getBody();
+
+} catch (RestClientResponseException e) {
+    log.error("REST请求失败，statusCode={}, responseBody={}",
+            e.getRawStatusCode(),
+            e.getResponseBodyAsString(),
+            e
+    );
+    throw e;
+
+} catch (RestClientException e) {
+    log.error("REST请求异常", e);
+    throw e;
+}
+
+
+import lombok.extern.slf4j.Slf4j;
+import org.springframework.http.HttpRequest;
+import org.springframework.http.client.*;
+import org.springframework.util.StreamUtils;
+
+import java.io.IOException;
+import java.nio.charset.StandardCharsets;
+
+@Slf4j
+public class RestTemplateLoggingInterceptor implements ClientHttpRequestInterceptor {
+
+    @Override
+    public ClientHttpResponse intercept(
+            HttpRequest request,
+            byte[] body,
+            ClientHttpRequestExecution execution
+    ) throws IOException {
+
+        logRequest(request, body);
+
+        ClientHttpResponse response = execution.execute(request, body);
+
+        logResponse(response);
+
+        return response;
+    }
+
+    private void logRequest(HttpRequest request, byte[] body) {
+        log.info("================ REST Request ================");
+        log.info("URI         : {}", request.getURI());
+        log.info("Method      : {}", request.getMethod());
+        log.info("Headers     : {}", request.getHeaders());
+        log.info("Body        : {}", new String(body, StandardCharsets.UTF_8));
+        log.info("==============================================");
+    }
+
+    private void logResponse(ClientHttpResponse response) throws IOException {
+        log.info("================ REST Response ===============");
+        log.info("Status code : {}", response.getStatusCode());
+        log.info("Status text : {}", response.getStatusText());
+        log.info("Headers     : {}", response.getHeaders());
+        log.info("Body        : {}", StreamUtils.copyToString(response.getBody(), StandardCharsets.UTF_8));
+        log.info("==============================================");
+    }
+}
+
+
+
+@Bean
+public RestTemplate restTemplate() {
+    SimpleClientHttpRequestFactory requestFactory = new SimpleClientHttpRequestFactory();
+
+    RestTemplate restTemplate = new RestTemplate(
+            new BufferingClientHttpRequestFactory(requestFactory)
+    );
+
+    restTemplate.getInterceptors().add(new RestTemplateLoggingInterceptor());
+
+    return restTemplate;
+}
+
+
+@Bean
+public RestTemplate restTemplate(RestTemplateBuilder builder) {
+    RestTemplate restTemplate = builder
+            .requestFactory(() -> new BufferingClientHttpRequestFactory(
+                    new SimpleClientHttpRequestFactory()
+            ))
+            .build();
+
+    restTemplate.getInterceptors().add(new RestTemplateLoggingInterceptor());
+
+    return restTemplate;
+}
+
+
+
+logging:
+  level:
+    org.springframework.web.client.RestTemplate: DEBUG
+    org.springframework.http.client: DEBUG
